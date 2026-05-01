@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: meterflow_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - meterflow_network
+
+  backend:
+    build: ./backend
+    container_name: meterflow_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/data:/app/data
+      - ./backend/seed_data.py:/app/seed_data.py
+      - ./backend/seed_admin.py:/app/seed_admin.py
+    environment:
+      DATABASE_URL: sqlite:///./data/meterflow.db
+      PAYMENTS_DATABASE_URL: sqlite:///./data/payments.db
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - meterflow_network
+
+  frontend:
+    build: ./frontend
+    container_name: meterflow_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+    depends_on:
+      - backend
+    networks:
+      - meterflow_network
+
+networks:
+  meterflow_network:
