@@ -33,6 +33,9 @@ async def api_proxy(
     
     headers.pop("host", None)
     headers.pop("content-length", None)
+    headers.pop("accept-encoding", None)
+    if "accept-encoding" in headers:
+        del headers["accept-encoding"]
 
     # 4. Proxy the Request and Track Usage
     start_time = time.time()
@@ -61,10 +64,14 @@ async def api_proxy(
             db.add(usage_log)
             db.commit()
 
+            resp_headers = dict(upstream_response.headers)
+            resp_headers.pop("content-encoding", None)
+            resp_headers.pop("content-length", None)
+
             return Response(
                 content=upstream_response.content,
                 status_code=upstream_response.status_code,
-                headers=dict(upstream_response.headers)
+                headers=resp_headers
             )
             
         except httpx.RequestError as exc:

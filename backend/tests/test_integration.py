@@ -1,3 +1,121 @@
+import time
+import redis
+from unittest.mock import patch
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.main import app
+from app.config.database import Base, get_db, get_payments_db
+from app.models import APIKey, User, Subscription, UsageLog, SubscriptionPlan
+from app.models.payments import PaymentBase, PaymentTransaction
+import uuid
+
+# Setup Test Database
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test2.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+PAYMENTS_DATABASE_URL = "sqlite:///./test_payments2.db"
+p_engine = create_engine(PAYMENTS_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingPaymentsSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=p_engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+def override_get_payments_db():
+    try:
+        db = TestingPaymentsSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_payments_db] = override_get_payments_db
+
+client = TestClient(app)
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=engine)
+    PaymentBase.metadata.create_all(bind=p_engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+    PaymentBase.metadata.drop_all(bind=p_engine)
+
+def test_admin_role_based_access():
+    # 1. Register a normal user
+    email_normal = f"normal_{uuid.uuid4().hex[:6]}@example.com"
+    client.post("/api/v1/auth/register", json={"email": email_normal, "password": "password123", "full_name": "Normal User"})
+    login_res = client.post("/api/v1/auth/login", json={"email": email_normal, "password": "password123"})
+    token_normal = login_res.json()["access_token"]
+    headers_normal = {"Authorization": f"Bearer {token_normal}"}
+
+    # 2. Register an admin user
+    email_admin = f"admin_{uuid.uuid4().hex[:6]}@example.com"
+    client.post("/api/v1/auth/register", json={"email": email_admin, "password": "password123", "full_name": "Admin User"})
+
+    # Make admin
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.email == email_admin).first()
+    user.is_superuser = True
+    db.commit()
+    db.close()
+
+    login_res_admin = client.post("/api/v1/auth/login", json={"email": email_admin, "password": "password123"})
+    token_admin = login_res_admin.json()["access_token"]
+    headers_admin = {"Authorization": f"Bearer {token_admin}"}
+
+    # 3. Test Admin endpoints with normal user
+    response = client.get("/api/v1/admin/users", headers=headers_normal)
+    assert response.status_code == 403
+
+    response = client.get("/api/v1/admin/api-keys", headers=headers_normal)
+    assert response.status_code == 403
+
+    # 4. Test Admin endpoints with admin user
+    response = client.get("/api/v1/admin/users", headers=headers_admin)
+    assert response.status_code == 200
+    assert len(response.json()) >= 2
+
+    response = client.get("/api/v1/admin/api-keys", headers=headers_admin)
+    assert response.status_code == 200
+
+def test_api_key_url_validation():
+    email = f"test_{uuid.uuid4().hex[:6]}@example.com"
+    client.post("/api/v1/auth/register", json={"email": email, "password": "password123", "full_name": "Test User"})
+    login_res = client.post("/api/v1/auth/login", json={"email": email, "password": "password123"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Invalid URL (no scheme)
+    response = client.post("/api/v1/api-keys/", headers=headers, json={
+        "name": "Invalid URL Key",
+        "upstream_url": "invalid-url"
+    })
+    assert response.status_code == 400
+    assert "Invalid upstream URL" in response.json()["detail"]
+
+    # 2. Invalid URL (unreachable)
+    response = client.post("/api/v1/api-keys/", headers=headers, json={
+        "name": "Unreachable URL Key",
+        "upstream_url": "http://thisurldoesnotexist.com"
+    })
+    assert response.status_code == 400
+    assert "Invalid or unreachable upstream URL" in response.json()["detail"]
+
+    # 3. Valid URL
+    response = client.post("/api/v1/api-keys/", headers=headers, json={
+        "name": "Valid URL Key",
+        "upstream_url": "https://jsonplaceholder.typicode.com"
+    })
+    assert response.status_code == 201
+    assert response.json()["upstream_url"] == "https://jsonplaceholder.typicode.com"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -36,7 +154,7 @@ app.dependency_overrides[get_payments_db] = override_get_payments_db
 
 client = TestClient(app)
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def setup_db():
     Base.metadata.create_all(bind=engine)
     PaymentBase.metadata.create_all(bind=p_engine)
@@ -167,3 +285,98 @@ def test_stripe_integration(mock_session, mock_customer):
     response = client.post(f"/api/v1/billing/create-checkout-session/{plan_id}", headers=headers)
     assert response.status_code == 200
     assert response.json()["url"] == "https://checkout.stripe.com/test"
+from unittest.mock import patch
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.main import app
+from app.config.database import Base, get_db, get_payments_db
+from app.models import APIKey, User, Subscription, UsageLog, SubscriptionPlan
+from app.models.payments import PaymentBase, PaymentTransaction
+import uuid
+import time
+import redis
+
+# Setup Test Database
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test3.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+PAYMENTS_DATABASE_URL = "sqlite:///./test_payments3.db"
+p_engine = create_engine(PAYMENTS_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingPaymentsSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=p_engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+def override_get_payments_db():
+    try:
+        db = TestingPaymentsSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_payments_db] = override_get_payments_db
+
+client = TestClient(app)
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=engine)
+    PaymentBase.metadata.create_all(bind=p_engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+    PaymentBase.metadata.drop_all(bind=p_engine)
+
+@patch('app.middleware.rate_limit.SessionLocal')
+def test_rate_limiting(mock_session_local):
+    mock_session_local.return_value = TestingSessionLocal()
+
+    # Setup: Register, Login, Create Key
+    email = f"ratelimit_{uuid.uuid4().hex[:6]}@example.com"
+    client.post("/api/v1/auth/register", json={"email": email, "password": "pass", "full_name": "Rate Limit User"})
+    login_res = client.post("/api/v1/auth/login", json={"email": email, "password": "pass"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create_res = client.post("/api/v1/api-keys/", headers=headers, json={
+        "name": "Rate Limit Key",
+        "category": "Test",
+        "upstream_url": "https://jsonplaceholder.typicode.com"
+    })
+    key_str = create_res.json()["key"]
+    key_id = create_res.json()["id"]
+
+    # We need to manually set the rate limit to a very low number for testing
+    db = TestingSessionLocal()
+    api_key_obj = db.query(APIKey).filter(APIKey.id == key_id).first()
+    api_key_obj.rate_limit_per_minute = 2
+    db.commit()
+    db.close()
+
+    # Clear redis for this key
+    r = redis.Redis.from_url("redis://localhost:6379", decode_responses=True)
+    current_minute = int(time.time() // 60)
+    minute_key = f"ratelimit:{key_str}:minute:{current_minute}"
+    r.delete(minute_key)
+
+    proxy_headers = {"X-API-Key": key_str}
+
+    # Request 1 (should succeed)
+    res1 = client.get("/api/v1/proxy/todos/1", headers=proxy_headers)
+    assert res1.status_code == 200
+
+    # Request 2 (should succeed)
+    res2 = client.get("/api/v1/proxy/todos/2", headers=proxy_headers)
+    assert res2.status_code == 200
+
+    # Request 3 (should fail with 429)
+    res3 = client.get("/api/v1/proxy/todos/3", headers=proxy_headers)
+    assert res3.status_code == 429
+    assert "Rate limit exceeded" in res3.json()["detail"]

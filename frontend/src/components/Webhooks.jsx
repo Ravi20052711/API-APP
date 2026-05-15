@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { webhooksAPI } from '../services/api';
-import toast from 'react-hot-toast';
-import { Zap, Plus, Trash, Globe, Shield, Activity } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { webhooksAPI } from "../services/api";
+import toast from "react-hot-toast";
+import { Zap, Plus, Trash, Globe, Shield, Activity } from "lucide-react";
 
 export default function Webhooks() {
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newUrl, setNewUrl] = useState('');
+  const [newUrl, setNewUrl] = useState("");
 
   useEffect(() => {
     fetchWebhooks();
@@ -17,7 +17,7 @@ export default function Webhooks() {
       const response = await webhooksAPI.list();
       setWebhooks(response.data);
     } catch (error) {
-      console.error('Failed to fetch webhooks:', error);
+      console.error("Failed to fetch webhooks:", error);
     } finally {
       setLoading(false);
     }
@@ -29,25 +29,26 @@ export default function Webhooks() {
     try {
       const response = await webhooksAPI.create({ url: newUrl });
       setWebhooks([...webhooks, response.data]);
-      setNewUrl('');
-      toast.success('Webhook created');
+      setNewUrl("");
+      toast.success("Webhook created");
     } catch (error) {
-      toast.error('Failed to create webhook');
+      toast.error("Failed to create webhook");
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm("Are you sure?")) return;
     try {
       await webhooksAPI.delete(id);
-      setWebhooks(webhooks.filter(w => w.id !== id));
-      toast.success('Webhook deleted');
+      setWebhooks(webhooks.filter((w) => w.id !== id));
+      toast.success("Webhook deleted");
     } catch (error) {
-      toast.error('Failed to delete webhook');
+      toast.error("Failed to delete webhook");
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading webhooks...</div>;
+  if (loading)
+    return <div className="p-8 text-center">Loading webhooks...</div>;
 
   return (
     <div className="space-y-6">
@@ -57,7 +58,9 @@ export default function Webhooks() {
             <Zap className="w-8 h-8 text-indigo-600" />
             Developer Webhooks
           </h2>
-          <p className="text-gray-500 mt-1">Receive real-time notifications for platform events.</p>
+          <p className="text-gray-500 mt-1">
+            Receive real-time notifications for platform events.
+          </p>
         </div>
 
         <div className="p-8">
@@ -82,13 +85,20 @@ export default function Webhooks() {
         {webhooks.length === 0 ? (
           <div className="p-20 text-center border-t border-gray-100">
             <Globe className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900">No webhooks configured</h3>
-            <p className="text-gray-500 mt-1">Add an endpoint above to start receiving notifications.</p>
+            <h3 className="text-xl font-bold text-gray-900">
+              No webhooks configured
+            </h3>
+            <p className="text-gray-500 mt-1">
+              Add an endpoint above to start receiving notifications.
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100 border-t border-gray-100">
             {webhooks.map((webhook) => (
-              <div key={webhook.id} className="p-8 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+              <div
+                key={webhook.id}
+                className="p-8 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+              >
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
@@ -98,7 +108,8 @@ export default function Webhooks() {
                   </div>
                   <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
                     <span className="flex items-center gap-1">
-                      <Shield className="w-3 h-3" /> Secret: {webhook.secret?.substring(0, 12)}...
+                      <Shield className="w-3 h-3" /> Secret:{" "}
+                      {webhook.secret?.substring(0, 12)}...
                     </span>
                     <span className="flex items-center gap-1">
                       <Activity className="w-3 h-3" /> All Events (*)

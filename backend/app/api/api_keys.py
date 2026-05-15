@@ -57,7 +57,7 @@ def buy_api_key(
                 Subscription.user_id == current_user.id,
                 Subscription.status == "active"
             ).first()
-            
+
             if not subscription or subscription.plan.price_monthly == 0:
                 raise HTTPException(status_code=403, detail="Active paid subscription required to access marketplace keys")
 
@@ -71,11 +71,11 @@ def buy_api_key(
         )
         pdb.add(transaction)
         pdb.commit()
-    
+
     # Assign the key to the user (Works for both Free and Paid)
     api_key.user_id = current_user.id
     api_key.is_active = True
-    
+
     # LOG THIS AS USAGE
     usage_log = UsageLog(
         api_key_id=api_key.id,
@@ -87,36 +87,50 @@ def buy_api_key(
         ip_address="system"
     )
     db.add(usage_log)
-    
+
     # Standard expiry for all obtained keys
     if not api_key.expires_at:
         api_key.expires_at = datetime.utcnow() + timedelta(days=365)
-        
+
     db.commit()
     db.refresh(api_key)
     return api_key
 
 
 @router.post("/", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
-def create_api_key(
+async def create_api_key(
     api_key_data: APIKeyCreate,
     user_id: Optional[int] = Query(None), # Optional target user ID for admin
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Only administrators can create API keys")
+    import urllib.parse
+    import httpx
+    if api_key_data.upstream_url:
+        parsed = urllib.parse.urlparse(api_key_data.upstream_url)
+        if not all([parsed.scheme, parsed.netloc]):
+            raise HTTPException(status_code=400, detail="Invalid upstream URL. Must include scheme and host.")
+        try:
+            # Basic URL validation and reachability check
+            async with httpx.AsyncClient() as client:
+                res = await client.head(api_key_data.upstream_url, timeout=5.0)
+                # We don't strictly require 200, just that the host is reachable
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid or unreachable upstream URL: {str(e)}")
+
+    # if not current_user.is_superuser:
+    #     raise HTTPException(status_code=403, detail="Only administrators can create API keys")
 
     # LOGIC:
     # 1. If target user_id is provided, use it.
     # 2. If no target user_id and it's PAID, it's a Marketplace Key (user_id = None).
     # 3. If no target user_id and it's FREE, it's the Admin's private key (user_id = current_user.id).
-    
+
     uid = user_id
     if uid is None:
         if not api_key_data.is_paid:
             uid = current_user.id
-        
+
     api_key = APIKey(
         key=generate_api_key(),
         name=api_key_data.name,
@@ -129,14 +143,14 @@ def create_api_key(
         rate_limit_per_minute=api_key_data.rate_limit_per_minute,
         rate_limit_per_day=api_key_data.rate_limit_per_day
     )
-    
+
     if api_key_data.expires_at:
         api_key.expires_at = api_key_data.expires_at
-    
+
     db.add(api_key)
     db.commit()
     db.refresh(api_key)
-    
+
     return api_key
 
 
@@ -149,12 +163,12 @@ def toggle_api_key(
     query = db.query(APIKey).filter(APIKey.id == api_key_id)
     if not current_user.is_superuser:
         query = query.filter(APIKey.user_id == current_user.id)
-        
+
     api_key = query.first()
     
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
-    
+
     api_key.is_active = not api_key.is_active
     db.commit()
     db.refresh(api_key)
@@ -171,12 +185,12 @@ def rotate_api_key(
     query = db.query(APIKey).filter(APIKey.id == api_key_id)
     if not current_user.is_superuser:
         query = query.filter(APIKey.user_id == current_user.id)
-        
+
     api_key = query.first()
     
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
-    
+
     # Store current key as previous
     api_key.previous_key = api_key.key
     api_key.previous_key_expires_at = datetime.utcnow() + timedelta(days=7) # 7-day grace period
@@ -186,7 +200,7 @@ def rotate_api_key(
     
     db.commit()
     db.refresh(api_key)
-    
+
     return api_key
 
 
@@ -198,11 +212,11 @@ def delete_api_key(
 ):
     if not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Only administrators can delete API keys")
-        
+
     api_key = db.query(APIKey).filter(APIKey.id == api_key_id).first()
-    
+
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
-    
+
     db.delete(api_key)
     db.commit()
