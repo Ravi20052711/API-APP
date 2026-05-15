@@ -1,8 +1,18 @@
-import { useEffect, useState } from 'react';
-import { usageAPI } from '../services/api';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Activity, TrendingUp, AlertCircle, Zap, Globe } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useEffect, useState } from "react";
+import { usageAPI } from "../services/api";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
+import { Activity, TrendingUp, AlertCircle, Zap, Globe } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export default function UsageStats() {
   const [stats, setStats] = useState(null);
@@ -12,19 +22,19 @@ export default function UsageStats() {
 
   useEffect(() => {
     fetchStats();
-    
+
     // WebSocket for real-time updates
     const ws = new WebSocket(`ws://localhost:8000/api/v1/ws/${user?.id}`);
-    
+
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === 'usage_update') {
-        setStats(prev => {
+      if (data.type === "usage_update") {
+        setStats((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
             total_requests: prev.total_requests + 1,
-            // Simple RPM update: just incrementing doesn't account for time window, 
+            // Simple RPM update: just incrementing doesn't account for time window,
             // but fetchStats will refresh it correctly.
           };
         });
@@ -39,7 +49,7 @@ export default function UsageStats() {
       const response = await usageAPI.stats(days);
       setStats(response.data);
     } catch (error) {
-      console.error('Failed to fetch stats:', error);
+      console.error("Failed to fetch stats:", error);
     } finally {
       setLoading(false);
     }
@@ -50,7 +60,11 @@ export default function UsageStats() {
   }
 
   if (!stats) {
-    return <div className="text-center py-8 text-gray-500">No usage data available</div>;
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No usage data available
+      </div>
+    );
   }
 
   return (
@@ -75,15 +89,21 @@ export default function UsageStats() {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-gray-400 mb-2">
             <Globe className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-wider">Total Requests</span>
+            <span className="text-xs font-black uppercase tracking-wider">
+              Total Requests
+            </span>
           </div>
-          <p className="text-3xl font-black text-gray-900">{stats.total_requests.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900">
+            {stats.total_requests.toLocaleString()}
+          </p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-indigo-400 mb-2">
             <TrendingUp className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-wider">Current RPM</span>
+            <span className="text-xs font-black uppercase tracking-wider">
+              Current RPM
+            </span>
           </div>
           <p className="text-3xl font-black text-indigo-600">{stats.rpm}</p>
         </div>
@@ -91,17 +111,25 @@ export default function UsageStats() {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-orange-400 mb-2">
             <Zap className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-wider">Avg Latency</span>
+            <span className="text-xs font-black uppercase tracking-wider">
+              Avg Latency
+            </span>
           </div>
-          <p className="text-3xl font-black text-orange-500">{stats.latency_ms?.avg}ms</p>
+          <p className="text-3xl font-black text-orange-500">
+            {stats.latency_ms?.avg}ms
+          </p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-red-400 mb-2">
             <AlertCircle className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-wider">Error Rate</span>
+            <span className="text-xs font-black uppercase tracking-wider">
+              Error Rate
+            </span>
           </div>
-          <p className="text-3xl font-black text-red-500">{stats.error_rate}%</p>
+          <p className="text-3xl font-black text-red-500">
+            {stats.error_rate}%
+          </p>
         </div>
       </div>
 
@@ -115,28 +143,41 @@ export default function UsageStats() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={stats.requests_by_day}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fontSize: 10, fontWeight: 'bold', fill: '#9ca3af'}}
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f3f4f6"
                   />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fontSize: 10, fontWeight: 'bold', fill: '#9ca3af'}}
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fontWeight: "bold", fill: "#9ca3af" }}
                   />
-                  <Tooltip 
-                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fontWeight: "bold", fill: "#9ca3af" }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="#4f46e5" 
-                    strokeWidth={4} 
-                    dot={{r: 4, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff'}}
-                    activeDot={{r: 6}}
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "16px",
+                      border: "none",
+                      boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#4f46e5"
+                    strokeWidth={4}
+                    dot={{
+                      r: 4,
+                      fill: "#4f46e5",
+                      strokeWidth: 2,
+                      stroke: "#fff",
+                    }}
+                    activeDot={{ r: 6 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -152,9 +193,14 @@ export default function UsageStats() {
             </h3>
             <div className="space-y-4">
               {stats.endpoint_breakdown.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl"
+                >
                   <div>
-                    <p className="font-bold text-gray-900 text-sm">{item.endpoint}</p>
+                    <p className="font-bold text-gray-900 text-sm">
+                      {item.endpoint}
+                    </p>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
                       Avg Latency: {item.avg_latency_ms}ms
                     </p>

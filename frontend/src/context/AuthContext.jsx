@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { authAPI } from "../services/api";
 
 const AuthContext = createContext(null);
 
@@ -8,7 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       fetchUser();
     } else {
@@ -21,8 +21,8 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.getMe();
       setUser(response.data);
     } catch (error) {
-      console.error('Failed to fetch user:', error);
-      localStorage.removeItem('token');
+      console.error("Failed to fetch user:", error);
+      localStorage.removeItem("token");
       setUser(null);
     } finally {
       setLoading(false);
@@ -31,13 +31,13 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await authAPI.login(email, password);
-    localStorage.setItem('token', response.data.access_token);
+    localStorage.setItem("token", response.data.access_token);
     await fetchUser();
     return response.data;
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setUser(null);
   };
 
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
-    refetchUser: fetchUser
+    refetchUser: fetchUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

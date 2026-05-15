@@ -95,31 +95,27 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         content={"detail": "Rate limit exceeded (per day)"}
                     )
                 
-                self.redis_client.incr(minute_key)
-                self.redis_client.expire(minute_key, 60)
-                
-                self.redis_client.incr(day_key)
-                self.redis_client.expire(day_key, 86400)
+                # Atomic increment and expire
+                pipe = self.redis_client.pipeline()
+                pipe.incr(minute_key)
+                pipe.expire(minute_key, 60, nx=True) # set expire only if key does not have an expiry
+                pipe.incr(day_key)
+                pipe.expire(day_key, 86400, nx=True)
+                pipe.execute()
                 
                 # Update last used
                 api_key_obj.last_used_at = datetime.utcnow()
                 db.commit()
 
-            # Process request - Close DB session before calling next to avoid pool exhaustion
-            db.close()
-            
             start_time = time.time()
             response = await call_next(request)
             process_time = (time.time() - start_time) * 1000
             
-            # Re-open session to log usage
+            # Log usage
             if api_key_obj:
-                api_key_id = api_key_obj.id
-                user_id = api_key_obj.user_id
-                db = SessionLocal()
                 usage_log = UsageLog(
-                    api_key_id=api_key_id,
-                    user_id=user_id,
+                    api_key_id=api_key_obj.id,
+                    user_id=api_key_obj.user_id,
                     endpoint=str(request.url.path),
                     method=request.method,
                     status_code=response.status_code,
@@ -133,13 +129,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 # BROADCAST VIA WEBSOCKET
                 from app.api.websockets import manager
                 import asyncio
-                asyncio.create_task(manager.broadcast_to_user(user_id, {
+                asyncio.create_task(manager.broadcast_to_user(api_key_obj.user_id, {
                     "type": "usage_update",
                     "endpoint": str(request.url.path),
                     "status_code": response.status_code,
                     "response_time_ms": process_time
                 }))
-                db.close()
             
             return response
         except Exception as e:

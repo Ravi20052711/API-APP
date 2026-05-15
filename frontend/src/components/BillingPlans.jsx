@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { billingAPI } from '../services/api';
-import { Check } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from "react";
+import { billingAPI } from "../services/api";
+import { Check } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function BillingPlans() {
   const [plans, setPlans] = useState([]);
@@ -18,17 +18,17 @@ export default function BillingPlans() {
       // Fetch plans (public-ish)
       const plansRes = await billingAPI.getPlans();
       setPlans(plansRes.data);
-      
+
       // Fetch user's subscription (private)
       try {
         const subscriptionRes = await billingAPI.getSubscription();
         setCurrentSubscription(subscriptionRes.data);
       } catch (subError) {
-        console.warn('Failed to fetch user subscription:', subError);
+        console.warn("Failed to fetch user subscription:", subError);
       }
     } catch (error) {
-      console.error('Failed to fetch billing data:', error);
-      toast.error('Failed to load subscription plans');
+      console.error("Failed to fetch billing data:", error);
+      toast.error("Failed to load subscription plans");
     } finally {
       setLoading(false);
     }
@@ -36,7 +36,7 @@ export default function BillingPlans() {
 
   const handleSubscribe = async (planId) => {
     if (processing) return;
-    
+
     setProcessing(true);
     try {
       const response = await billingAPI.createCheckoutSession(planId);
@@ -44,8 +44,10 @@ export default function BillingPlans() {
         window.location.href = response.data.url;
       }
     } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to initialize checkout');
+      console.error("Checkout error:", error);
+      toast.error(
+        error.response?.data?.detail || "Failed to initialize checkout",
+      );
       setProcessing(false);
     }
   };
@@ -56,12 +58,15 @@ export default function BillingPlans() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">Subscription Plans</h2>
-      
+      <h2 className="text-xl font-semibold text-gray-900">
+        Subscription Plans
+      </h2>
+
       {currentSubscription?.subscription && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-green-800">
-            Current Plan: <strong>{currentSubscription.plan?.name || 'Free'}</strong>
+            Current Plan:{" "}
+            <strong>{currentSubscription.plan?.name || "Free"}</strong>
           </p>
         </div>
       )}
@@ -72,13 +77,13 @@ export default function BillingPlans() {
             key={plan.id}
             className={`bg-white rounded-lg shadow-lg p-6 border-2 ${
               currentSubscription?.plan?.id === plan.id
-                ? 'border-blue-500'
-                : 'border-transparent'
+                ? "border-blue-500"
+                : "border-transparent"
             }`}
           >
             <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
             <p className="text-gray-600 text-sm mt-1">{plan.description}</p>
-            
+
             <div className="mt-4">
               <span className="text-3xl font-bold text-gray-900">
                 ${plan.price_monthly}
@@ -88,7 +93,8 @@ export default function BillingPlans() {
 
             {plan.price_yearly && (
               <p className="text-sm text-gray-500 mt-1">
-                ${plan.price_yearly}/year (save ${(plan.price_monthly * 12 - plan.price_yearly).toFixed(0)})
+                ${plan.price_yearly}/year (save $
+                {(plan.price_monthly * 12 - plan.price_yearly).toFixed(0)})
               </p>
             )}
 
@@ -106,8 +112,8 @@ export default function BillingPlans() {
                 {plan.rate_limit_per_day.toLocaleString()} req/day
               </li>
               <li className="flex items-start gap-2 text-sm text-gray-600">
-                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                ${plan.overage_rate_per_request}/request overage
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />$
+                {plan.overage_rate_per_request}/request overage
               </li>
             </ul>
 
@@ -116,11 +122,15 @@ export default function BillingPlans() {
               disabled={currentSubscription?.plan?.id === plan.id || processing}
               className={`mt-6 w-full py-2 px-4 rounded-md font-medium ${
                 currentSubscription?.plan?.id === plan.id
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               }`}
             >
-              {currentSubscription?.plan?.id === plan.id ? 'Current Plan' : processing ? 'Processing...' : 'Subscribe'}
+              {currentSubscription?.plan?.id === plan.id
+                ? "Current Plan"
+                : processing
+                  ? "Processing..."
+                  : "Subscribe"}
             </button>
           </div>
         ))}
